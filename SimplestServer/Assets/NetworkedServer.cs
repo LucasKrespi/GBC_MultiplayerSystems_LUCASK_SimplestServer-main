@@ -26,6 +26,8 @@ public class NetworkedServer : MonoBehaviour
 
     LinkedList<PlayerAcc> m_ListPLayerAcc;
 
+    string m_sPlayerAccDataFilePath;
+
     enum ClientToServerSignifiers
     {
         LOGIN = 0,
@@ -42,6 +44,9 @@ public class NetworkedServer : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        m_sPlayerAccDataFilePath = Application.dataPath + Path.DirectorySeparatorChar + "PlayerAccData.txt";
+
+
         NetworkTransport.Init();
         ConnectionConfig config = new ConnectionConfig();
         reliableChannelID = config.AddChannel(QosType.Reliable);
@@ -50,6 +55,10 @@ public class NetworkedServer : MonoBehaviour
         hostID = NetworkTransport.AddHost(topology, socketPort, null);
 
         m_ListPLayerAcc = new LinkedList<PlayerAcc>();
+
+       
+
+        LoadPlayerAcc();
     }
 
     // Update is called once per frame
@@ -103,6 +112,35 @@ public class NetworkedServer : MonoBehaviour
 
         if (signifier == (int)ClientToServerSignifiers.LOGIN)
         {
+            string n = csv[1];
+
+            string p = csv[2];
+
+            bool hasBeenFound = false;
+           
+
+            foreach(PlayerAcc pa in m_ListPLayerAcc)
+            {
+                if(pa.m_name == n)
+                {
+                    if(pa.m_passaword == p)
+                    {
+                        SendMessageToClient(ServerToClientSignifiers.LOGIN_SUCCESS.ToString(), id);
+                    }
+                    else
+                    {
+                        SendMessageToClient(ServerToClientSignifiers.LOGIN_FALIED.ToString() + " Wrong Password ", id);
+                    }
+
+                    hasBeenFound = true;
+                    break;
+                }
+            }
+
+            if (!hasBeenFound)
+            {
+                SendMessageToClient(ServerToClientSignifiers.LOGIN_FALIED.ToString() + " Client not found ", id);
+            }
 
         }
         else if(signifier == (int)ClientToServerSignifiers.CREATE_USER)
@@ -132,6 +170,8 @@ public class NetworkedServer : MonoBehaviour
                 m_ListPLayerAcc.AddLast(new PlayerAcc(n, p));
 
                 SendMessageToClient((int)ServerToClientSignifiers.CREATE_USER_SUCCESS + "," + ServerToClientSignifiers.CREATE_USER_SUCCESS, id);
+
+                SavePlayerAcc();
             }
             else
             {
@@ -141,4 +181,36 @@ public class NetworkedServer : MonoBehaviour
         }
     }
 
+
+    private void SavePlayerAcc()
+    {
+        StreamWriter sw = new StreamWriter(m_sPlayerAccDataFilePath);
+        
+        foreach(PlayerAcc pa in m_ListPLayerAcc)
+        {
+            sw.WriteLine(pa.m_name + "," + pa.m_passaword);
+        }
+
+        sw.Close();
+    }
+
+    private void LoadPlayerAcc()
+    {
+        if (File.Exists(m_sPlayerAccDataFilePath))
+        {
+            StreamReader sr = new StreamReader(m_sPlayerAccDataFilePath);
+
+            string line;
+
+            while((line = sr.ReadLine()) != null)
+            {
+                string[] csv = line.Split(',');
+
+                PlayerAcc pa = new PlayerAcc(csv[0], csv[1]);
+
+                m_ListPLayerAcc.AddLast(pa);
+            }
+
+        }
+    }
 }
