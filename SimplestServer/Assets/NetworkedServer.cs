@@ -47,7 +47,8 @@ public class NetworkedServer : MonoBehaviour
         LOGIN = 0,
         CREATE_USER = 1,
         ADD_TO_GAME_SESSION = 2,
-        PLAY_WAS_MADE = 3
+        PLAY_WAS_MADE = 3,
+     
     }
 
     enum ServerToClientSignifiers
@@ -57,7 +58,10 @@ public class NetworkedServer : MonoBehaviour
         CREATE_USER_SUCCESS = 1,
         CREATE_USER_FALIED = 2,
         GAME_SESSION_STARTED = 3,
-        OPPONENT_PLAY = 4
+        OPPONENT_PLAY = 4,
+        FIRST_PLAYER = 5,
+        SECOND_PLAYER = 6
+
     }
     // Start is called before the first frame update
     void Start()
@@ -209,8 +213,8 @@ public class NetworkedServer : MonoBehaviour
 
                 m_ListGameSessions.AddLast(gs);
 
-                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString(), id);
-                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString(), playerWaitingForMatch);
+                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString()+ "," + (int)ServerToClientSignifiers.SECOND_PLAYER, id);
+                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString() + "," + (int)ServerToClientSignifiers.FIRST_PLAYER, playerWaitingForMatch);
 
                 playerWaitingForMatch = -1;
             }
@@ -222,11 +226,11 @@ public class NetworkedServer : MonoBehaviour
 
             if(gs.playerID1 == id)
             {
-                SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString(), gs.playerID2);
+                SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], gs.playerID2);
             }
             else
             {
-                SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString(), gs.playerID1);
+                SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], gs.playerID1);
             }
         }
 
