@@ -16,6 +16,17 @@ public class PlayerAcc
         this.m_passaword = password;
     }
 }
+
+public class GameSession
+{
+    public int playerID1, playerID2;
+
+    public GameSession(int PlayerID1, int PlayerID2)
+    {
+        playerID1 = PlayerID1;
+        playerID2 = PlayerID2;
+    }
+}
 public class NetworkedServer : MonoBehaviour
 {
     int maxConnections = 1000;
@@ -25,13 +36,18 @@ public class NetworkedServer : MonoBehaviour
     int socketPort = 5491;
 
     LinkedList<PlayerAcc> m_ListPLayerAcc;
+    LinkedList<GameSession> m_ListGameSessions;
 
     string m_sPlayerAccDataFilePath;
+
+    int playerWaitingForMatch = -1;
 
     enum ClientToServerSignifiers
     {
         LOGIN = 0,
-        CREATE_USER = 1
+        CREATE_USER = 1,
+        ADD_TO_GAME_SESSION = 2,
+        PLAY_WAS_MADE = 3
     }
 
     enum ServerToClientSignifiers
@@ -39,7 +55,9 @@ public class NetworkedServer : MonoBehaviour
         LOGIN_FALIED = -1,
         LOGIN_SUCCESS = 0,
         CREATE_USER_SUCCESS = 1,
-        CREATE_USER_FALIED = 2
+        CREATE_USER_FALIED = 2,
+        GAME_SESSION_STARTED = 3,
+        OPPONENT_PLAY = 4
     }
     // Start is called before the first frame update
     void Start()
@@ -55,7 +73,7 @@ public class NetworkedServer : MonoBehaviour
         hostID = NetworkTransport.AddHost(topology, socketPort, null);
 
         m_ListPLayerAcc = new LinkedList<PlayerAcc>();
-
+        m_ListGameSessions = new LinkedList<GameSession>();
        
 
         LoadPlayerAcc();
@@ -125,11 +143,11 @@ public class NetworkedServer : MonoBehaviour
                 {
                     if(pa.m_passaword == p)
                     {
-                        SendMessageToClient(ServerToClientSignifiers.LOGIN_SUCCESS.ToString(), id);
+                        SendMessageToClient(((int)ServerToClientSignifiers.LOGIN_SUCCESS).ToString(), id);
                     }
                     else
                     {
-                        SendMessageToClient(ServerToClientSignifiers.LOGIN_FALIED.ToString() + " Wrong Password ", id);
+                        SendMessageToClient((int)ServerToClientSignifiers.LOGIN_FALIED + ", Wrong Password ", id);
                     }
 
                     hasBeenFound = true;
@@ -139,7 +157,7 @@ public class NetworkedServer : MonoBehaviour
 
             if (!hasBeenFound)
             {
-                SendMessageToClient(ServerToClientSignifiers.LOGIN_FALIED.ToString() + " Client not found ", id);
+                SendMessageToClient((int)ServerToClientSignifiers.LOGIN_FALIED + ", Client not found ", id);
             }
 
         }
@@ -179,6 +197,39 @@ public class NetworkedServer : MonoBehaviour
                 SendMessageToClient((int)ServerToClientSignifiers.CREATE_USER_FALIED + "," + ServerToClientSignifiers.CREATE_USER_FALIED, id);
             }
         }
+        else if (signifier == (int)ClientToServerSignifiers.ADD_TO_GAME_SESSION)
+        {
+            if(playerWaitingForMatch == -1)
+            {
+                playerWaitingForMatch = id;
+            }
+            else
+            {
+                GameSession gs = new GameSession(playerWaitingForMatch, id);
+
+                m_ListGameSessions.AddLast(gs);
+
+                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString(), id);
+                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString(), playerWaitingForMatch);
+
+                playerWaitingForMatch = -1;
+            }
+        }
+        else if (signifier == (int)ClientToServerSignifiers.PLAY_WAS_MADE)
+        {
+
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            if(gs.playerID1 == id)
+            {
+                SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString(), gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString(), gs.playerID1);
+            }
+        }
+
     }
 
 
@@ -212,5 +263,17 @@ public class NetworkedServer : MonoBehaviour
             }
 
         }
+    }
+
+    private GameSession FindGameSessionWithPlayerID(int ID)
+    {
+        foreach(GameSession gs in m_ListGameSessions)
+        {
+            if(gs.playerID1 == ID || gs.playerID2 == ID)
+            {
+                return gs;
+            }
+        }
+        return null;
     }
 }
