@@ -48,7 +48,8 @@ public class NetworkedServer : MonoBehaviour
         CREATE_USER = 1,
         ADD_TO_GAME_SESSION = 2,
         PLAY_WAS_MADE = 3,
-     
+        CHAT_MSG = 4
+
     }
 
     enum ServerToClientSignifiers
@@ -60,7 +61,8 @@ public class NetworkedServer : MonoBehaviour
         GAME_SESSION_STARTED = 3,
         OPPONENT_PLAY = 4,
         FIRST_PLAYER = 5,
-        SECOND_PLAYER = 6
+        SECOND_PLAYER = 6,
+        CHAT_MSG = 7
 
     }
     // Start is called before the first frame update
@@ -233,6 +235,22 @@ public class NetworkedServer : MonoBehaviour
                 SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], gs.playerID1);
             }
         }
+        else if (signifier == (int)ClientToServerSignifiers.CHAT_MSG)
+        {
+            GameSession gs = FindGameSessionWithPlayerID(id);
+
+            List<string> temp = new List<string>(csv);
+            temp.RemoveAt(0);
+
+            if (gs.playerID1 == id)
+            {
+                SendMessageToClient(((int)ServerToClientSignifiers.CHAT_MSG).ToString() + "," + string.Join(", ",temp) , gs.playerID2);
+            }
+            else
+            {
+                SendMessageToClient(((int)ServerToClientSignifiers.CHAT_MSG).ToString() + "," + string.Join(", ", temp), gs.playerID1);
+            }
+        }
 
     }
 
@@ -280,4 +298,5 @@ public class NetworkedServer : MonoBehaviour
         }
         return null;
     }
+
 }
