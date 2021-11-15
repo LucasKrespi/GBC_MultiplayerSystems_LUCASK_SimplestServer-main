@@ -21,10 +21,16 @@ public class GameSession
 {
     public int playerID1, playerID2;
 
+    public LinkedList<int> observersID;
+
+    public bool hasStarted = false;
+
     public GameSession(int PlayerID1, int PlayerID2)
     {
         playerID1 = PlayerID1;
         playerID2 = PlayerID2;
+
+        observersID = new LinkedList<int>();
     }
 }
 public class NetworkedServer : MonoBehaviour
@@ -48,8 +54,8 @@ public class NetworkedServer : MonoBehaviour
         CREATE_USER = 1,
         ADD_TO_GAME_SESSION = 2,
         PLAY_WAS_MADE = 3,
-        CHAT_MSG = 4
-
+        CHAT_MSG = 4,
+        JOIN_AS_OBSERVER = 5
     }
 
     enum ServerToClientSignifiers
@@ -62,8 +68,8 @@ public class NetworkedServer : MonoBehaviour
         OPPONENT_PLAY = 4,
         FIRST_PLAYER = 5,
         SECOND_PLAYER = 6,
-        CHAT_MSG = 7
-
+        CHAT_MSG = 7,
+        OBSERVER = 8
     }
     // Start is called before the first frame update
     void Start()
@@ -213,13 +219,28 @@ public class NetworkedServer : MonoBehaviour
             {
                 GameSession gs = new GameSession(playerWaitingForMatch, id);
 
+                gs.hasStarted = true;
+
                 m_ListGameSessions.AddLast(gs);
 
                 SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString()+ "," + (int)ServerToClientSignifiers.SECOND_PLAYER, id);
                 SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString() + "," + (int)ServerToClientSignifiers.FIRST_PLAYER, playerWaitingForMatch);
 
                 playerWaitingForMatch = -1;
+
+                if (gs.observersID.Count > 0)
+                {
+                    Debug.Log("ADD TO GAME SESSION LOOP " + gs.observersID.Count);
+                    foreach (int oID in gs.observersID)
+                    {
+                        SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString() + "," + (int)ServerToClientSignifiers.OBSERVER, oID);
+                    }
+                }
+              
+
             }
+
+            
         }
         else if (signifier == (int)ClientToServerSignifiers.PLAY_WAS_MADE)
         {
@@ -233,6 +254,14 @@ public class NetworkedServer : MonoBehaviour
             else
             {
                 SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], gs.playerID1);
+            }
+
+            if (gs.observersID.Count > 0)
+            {
+                foreach (int oID in gs.observersID)
+                {
+                    SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], oID);
+                }
             }
         }
         else if (signifier == (int)ClientToServerSignifiers.CHAT_MSG)
@@ -250,6 +279,26 @@ public class NetworkedServer : MonoBehaviour
             {
                 SendMessageToClient(((int)ServerToClientSignifiers.CHAT_MSG).ToString() + "," + string.Join(", ", temp), gs.playerID1);
             }
+
+            foreach (int oID in gs.observersID)
+            {
+                SendMessageToClient(((int)ServerToClientSignifiers.CHAT_MSG).ToString() + "," + string.Join(", ", temp), oID);
+            }
+
+
+        }
+
+        else if(signifier == (int)ClientToServerSignifiers.JOIN_AS_OBSERVER)
+        {
+            //For now can Only join in ther first game session (future search game settion with playerAcc
+            GameSession gs = m_ListGameSessions.First.Value;
+
+            if (gs.hasStarted)
+            {
+                SendMessageToClient(((int)ServerToClientSignifiers.GAME_SESSION_STARTED).ToString() + "," + (int)ServerToClientSignifiers.OBSERVER, id);
+            }            
+                        
+            gs.observersID.AddLast(id);
         }
 
     }
@@ -296,6 +345,7 @@ public class NetworkedServer : MonoBehaviour
                 return gs;
             }
         }
+
         return null;
     }
 
