@@ -33,6 +33,7 @@ public class GameSession
         observersID = new LinkedList<int>();
     }
 }
+
 public class NetworkedServer : MonoBehaviour
 {
     int maxConnections = 1000;
@@ -55,7 +56,8 @@ public class NetworkedServer : MonoBehaviour
         ADD_TO_GAME_SESSION = 2,
         PLAY_WAS_MADE = 3,
         CHAT_MSG = 4,
-        JOIN_AS_OBSERVER = 5
+        JOIN_AS_OBSERVER = 5,
+        LEAVE_GAME_SESSION = 6
     }
 
     enum ServerToClientSignifiers
@@ -69,7 +71,7 @@ public class NetworkedServer : MonoBehaviour
         FIRST_PLAYER = 5,
         SECOND_PLAYER = 6,
         CHAT_MSG = 7,
-        OBSERVER = 8
+        OBSERVER = 8,
     }
     // Start is called before the first frame update
     void Start()
@@ -287,7 +289,6 @@ public class NetworkedServer : MonoBehaviour
 
 
         }
-
         else if(signifier == (int)ClientToServerSignifiers.JOIN_AS_OBSERVER)
         {
             //For now can Only join in ther first game session (future search game settion with playerAcc
@@ -299,6 +300,14 @@ public class NetworkedServer : MonoBehaviour
             }            
                         
             gs.observersID.AddLast(id);
+        }
+        else if(signifier == (int)ClientToServerSignifiers.LEAVE_GAME_SESSION)
+        {
+            GameSession game = FindGameSessionWithPlayerID(int.Parse(csv[1]));
+            if (game != null)
+            {
+                m_ListGameSessions.Remove(game);
+            }
         }
 
     }
