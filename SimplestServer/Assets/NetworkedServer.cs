@@ -6,6 +6,7 @@ using UnityEngine.Networking;
 using System.IO;
 using UnityEngine.UI;
 
+
 public class PlayerAcc
 {
     public string m_name, m_passaword;
@@ -17,19 +18,55 @@ public class PlayerAcc
     }
 }
 
+public class ReplayMove
+{
+    public string m_sMove;
+    public int m_iIterator;
+
+    public ReplayMove(string move, int iterator)
+    {
+        m_sMove = move;
+        m_iIterator = iterator;
+    }
+}
+public class Replay
+{
+    public string replayID;
+    public LinkedList<ReplayMove> m_lkMoves;
+
+    public Replay()
+    {
+        m_lkMoves = new LinkedList<ReplayMove>();
+        replayID = ReplayCounter.id.ToString();
+        ReplayCounter.id++;
+    }
+}
+
+public static class ReplayCounter
+{
+    public static int id = 0;
+}
+
+
 public class GameSession
 {
     public int playerID1, playerID2;
 
     public LinkedList<int> observersID;
 
+    public Replay gsReplay;
+
+
     public bool hasStarted = false;
+
+
 
     public GameSession(int PlayerID1, int PlayerID2)
     {
         playerID1 = PlayerID1;
         playerID2 = PlayerID2;
 
+        gsReplay = new Replay();
         observersID = new LinkedList<int>();
     }
 }
@@ -44,8 +81,10 @@ public class NetworkedServer : MonoBehaviour
 
     LinkedList<PlayerAcc> m_ListPLayerAcc;
     LinkedList<GameSession> m_ListGameSessions;
+    LinkedList<Replay> m_ListOfReplays;
 
     string m_sPlayerAccDataFilePath;
+    string m_sGameSessionReplayDataFilePath;
 
     int playerWaitingForMatch = -1;
 
@@ -77,7 +116,7 @@ public class NetworkedServer : MonoBehaviour
     void Start()
     {
         m_sPlayerAccDataFilePath = Application.dataPath + Path.DirectorySeparatorChar + "PlayerAccData.txt";
-
+        m_sGameSessionReplayDataFilePath = Application.dataPath + Path.DirectorySeparatorChar + "Replays.txt";
 
         NetworkTransport.Init();
         ConnectionConfig config = new ConnectionConfig();
@@ -88,9 +127,10 @@ public class NetworkedServer : MonoBehaviour
 
         m_ListPLayerAcc = new LinkedList<PlayerAcc>();
         m_ListGameSessions = new LinkedList<GameSession>();
-       
+        m_ListOfReplays = new LinkedList<Replay>();
 
         LoadPlayerAcc();
+        LoadReplay();
     }
 
     // Update is called once per frame
@@ -252,10 +292,17 @@ public class NetworkedServer : MonoBehaviour
             if(gs.playerID1 == id)
             {
                 SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], gs.playerID2);
+
+                ReplayMove rm = new ReplayMove("X", int.Parse(csv[1]));
+                gs.gsReplay.m_lkMoves.AddLast(rm);
+                
             }
             else
             {
                 SendMessageToClient(((int)ServerToClientSignifiers.OPPONENT_PLAY).ToString() + "," + csv[1], gs.playerID1);
+
+                ReplayMove rm = new ReplayMove("O", int.Parse(csv[1]));
+                gs.gsReplay.m_lkMoves.AddLast(rm);
             }
 
             if (gs.observersID.Count > 0)
@@ -303,10 +350,11 @@ public class NetworkedServer : MonoBehaviour
         }
         else if(signifier == (int)ClientToServerSignifiers.LEAVE_GAME_SESSION)
         {
-            GameSession game = FindGameSessionWithPlayerID(int.Parse(csv[1]));
-            if (game != null)
+            GameSession gs = FindGameSessionWithPlayerID(id);
+            if (gs != null)
             {
-                m_ListGameSessions.Remove(game);
+                SaveReplay(gs.gsReplay);
+                m_ListGameSessions.Remove(gs);
             }
         }
 
@@ -342,9 +390,66 @@ public class NetworkedServer : MonoBehaviour
                 m_ListPLayerAcc.AddLast(pa);
             }
 
+            sr.Close();
         }
     }
+   
+    private void SaveReplay(Replay replay)
+    {
+        m_ListOfReplays.AddLast(replay);
 
+        StreamWriter sw = new StreamWriter(m_sGameSessionReplayDataFilePath);
+
+        
+        foreach (Replay r in m_ListOfReplays)
+        {
+            foreach (ReplayMove rm in r.m_lkMoves)
+            {
+                sw.WriteLine(replay.replayID + "," + rm.m_iIterator + "," + rm.m_sMove);
+            }
+        }
+        sw.Close();
+    }
+
+
+    private void LoadReplay()
+    {
+        if (File.Exists(m_sGameSessionReplayDataFilePath))
+        {
+            StreamReader sr = new StreamReader(m_sGameSessionReplayDataFilePath);
+
+            string line;
+
+            Replay r = new Replay();
+
+            while ((line = sr.ReadLine()) != null)
+            {
+                string[] csv = line.Split(',');
+
+                if(r.replayID == csv[0])
+                {
+                    ReplayMove rm = new ReplayMove(csv[2], int.Parse(csv[1]));
+
+                    r.m_lkMoves.AddLast(rm);
+                }
+                else
+                {
+                    m_ListOfReplays.AddLast(r);
+
+                    r = new Replay();
+
+                    ReplayMove rm = new ReplayMove(csv[2], int.Parse(csv[1]));
+
+                    r.m_lkMoves.AddLast(rm);
+                }
+            }
+
+            m_ListOfReplays.AddLast(r);
+
+            sr.Close();
+        }
+
+    }
     private GameSession FindGameSessionWithPlayerID(int ID)
     {
         foreach(GameSession gs in m_ListGameSessions)
